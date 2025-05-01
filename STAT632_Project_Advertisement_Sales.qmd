@@ -1,0 +1,850 @@
+---
+title: "STAT632 Project (Advertisement Sales Dataset)"
+author: "David Teng"
+date: "`r Sys.Date()`"
+output: pdf_document
+format: pdf
+editor: visual
+---
+
+## **About Dataset**
+
+### **Advertisement Sales Dataset**
+
+The Advertisement Sales dataset is a collection of data points used to analyze the impact of advertising on sales. This dataset consists of 200 entries, each representing a unique observation with data on various types of media advertising and corresponding sales figures.
+
+### Load Libraries and Data
+
+```{r}
+# Load necessary libraries
+library(MASS)          # for boxcox
+library(glmnet)        # for LASSO
+library(randomForest)  # for Random Forest
+library(car)           # for VIF
+library(ggplot2)       # for nice plots
+library(caret)         # for model validation
+library(dplyr)         # for data manipulation
+
+# Load data
+adver <- read.csv("Advertising And Sales.csv")
+
+# Quick overview
+summary(adver)
+str(adver)
+
+# Pairwise scatterplot with title
+pairs(Sales ~ TV + Radio + Newspaper, data = adver,
+      main = "Pairwise Scatterplot of Sales and
+      Advertising Channels")
+
+
+```
+
+### Data Preparation
+
+```{r}
+# Check for missing values
+colSums(is.na(adver))
+```
+
+### Base Multiple Linear Regression
+
+```{r}
+# Base Multiple Linear Regression
+lm1 <- lm(Sales ~ TV + Radio + Newspaper, data = adver)
+summary(lm1)
+```
+
+### Interpretation of Base Multiple Linear Regression:
+
+We fitted a multiple linear regression model to predict **Sales** based on **TV**, **Radio**, and **Newspaper** advertising budgets.
+
+-   The **Intercept** is estimated at **3.00** (p \< 0.001), meaning that when advertising budgets are zero, the expected sales would be about 3,000 units.
+
+-   The **TV advertising budget** has a **positive and significant** effect on Sales.
+
+    Each additional thousand dollars spent on TV is associated with an **increase of about 45.7 units** in Sales, **holding other factors constant** (p \< 0.001).
+
+-   The **Radio advertising budget** also has a **positive and significant** effect on Sales.
+
+    Each additional thousand dollars spent on Radio is associated with an **increase of about 187.1 units** in Sales (p \< 0.001).
+
+-   The **Newspaper advertising budget** is **not statistically significant** (p = 0.822), suggesting that spending on Newspaper ads does **not have a meaningful effect** on Sales in this model.
+
+### Goodness of Fit:
+
+-   The **Multiple R-squared** is **0.8958**, meaning the model explains about **89.6%** of the variance in Sales.
+
+-   The **Adjusted R-squared** is **0.8942**, which adjusts for the number of predictors and confirms the model still fits the data very well.
+
+-   The overall **F-statistic** is highly significant (p \< 2.2e-16), indicating that the model provides a better fit than a model with no predictors.
+
+### Conclusion:
+
+The model shows that TV and Radio advertising significantly increase sales, while Newspaper advertising does not. The model explains 89.6% of the variance in sales, and overall, it fits the data very well (F-test p \< 0.001).
+
+### Reduced Model (remove Newspaper)
+
+```{r}
+# Reduced Model (remove Newspaper)
+lm2 <- lm(Sales ~ TV + Radio, data = adver)
+summary(lm2)
+```
+
+### Interpretation of Reduced Model (TV + Radio only):
+
+We fitted a reduced multiple linear regression model to predict **Sales** using only **TV** and **Radio** advertising budgets (after removing Newspaper).
+
+-   The **Intercept** is estimated at **2.98** (p \< 0.001), meaning that when TV and Radio advertising expenditures are zero, the expected sales would be about **2,980 units**.
+
+-   The **TV advertising budget** remains a **positive and highly significant predictor** of Sales.
+
+    Each additional thousand dollars spent on TV advertising is associated with an **increase of approximately 45.7 units** in Sales, **holding Radio constant** (p \< 0.001).
+
+-   The **Radio advertising budget** also remains **positive and highly significant**.
+
+    Each additional thousand dollars spent on Radio advertising is associated with an **increase of approximately 186.4 units** in Sales (p \< 0.001).
+
+### Goodness of Fit:
+
+-   The **Multiple R-squared** is **0.8957**, indicating that about **89.6%** of the variance in Sales is explained by TV and Radio budgets.
+
+-   The **Adjusted R-squared** is **0.8947**, very close to the full model, suggesting that removing Newspaper **did not harm model fit**.
+
+-   The model's **F-statistic** is **highly significant** (p \< 2.2e-16), showing the model overall is statistically significant.
+
+### Model Comparison:
+
+-   Compared to the full model (TV + Radio + Newspaper), the reduced model achieves **almost identical R-squared** with fewer predictors.
+
+-   Based on the **partial F-test** and **adjusted R-squared**, we conclude that **Newspaper** advertising is **not necessary** for predicting Sales.
+
+### Conclusion:
+
+The reduced model including only TV and Radio advertising performs just as well as the full model. Both TV and Radio advertising expenditures have significant positive effects on Sales, while Newspaper advertising was found to be unnecessary. The reduced model explains about 89.6% of the variance in Sales and provides a simpler, equally effective prediction model.
+
+### Compare Models: Full vs Reduced:
+
+Hypotheses for Model Comparison:
+
+$H_0: \beta_{Newspaper} = 0$ (The coefficient for **Newspaper** is equal to zero which means Newspaper does **not** improve the model.)\
+
+vs. $H_1: \beta_{Newspaper} \neq 0$
+
+(The coefficient for **Newspaper** is **not** equal to zero which means Newspaper **does** improve the model.)
+
+```{r}
+# Compare Models: Full vs Reduced
+anova(lm2, lm1) # partial F-test 
+```
+
+### Interpretation of Model Comparison (Full vs Reduced):
+
+We conducted a **partial F-test** to formally compare the full model (**Sales \~ TV + Radio + Newspaper**) with the reduced model (**Sales \~ TV + Radio**).
+
+From the ANOVA table:
+
+-   The test statistic is **F = 0.0507**, with a corresponding **p-value = 0.8221**.
+
+-   The p-value is **much greater than 0.05**, meaning we **fail to reject** the null hypothesis.
+
+**Interpretation**:
+
+-   There is **no significant evidence** that adding **Newspaper** as a predictor improves the model.
+
+-   Therefore, the **simpler model with only TV and Radio** is preferred.
+
+### Additional Note:
+
+-   The Residual Sum of Squares (RSS) only **slightly decreased** from **563.09** to **562.95** after adding Newspaper, which is not meaningful.
+
+-   This further confirms that **Newspaper** is not a useful predictor for Sales.
+
+### Conclusion:
+
+Since the partial F-test (p = 0.8221), we **fail to reject** $H_0$​.\
+
+This means **Newspaper does not significantly improve** the model. Thus, the reduced model with only TV and Radio is sufficient.
+
+### Adjusted R-squared comparison
+
+```{r}
+# Adjusted R-squared comparison
+summary(lm1)$adj.r.squared # Full model (TV + Radio + Newspaper
+summary(lm2)$adj.r.squared # Reduced model (TV + Radio only)
+```
+
+### Adjusted R-squared Comparison Interpretation:
+
+The **adjusted R-squared** for the reduced model (**0.8947**) is **slightly higher** than that of the full model (**0.8942**).
+
+-   **Adjusted R-squared** adjusts for the number of predictors in the model.
+
+-   A **higher adjusted R-squared** suggests that the reduced model **fits the data better**, even though it uses **fewer predictors**.
+
+-   Therefore, the model including only **TV** and **Radio** provides a **better and simpler fit** than the model that also includes **Newspaper**.
+
+### Conclusion:
+
+The reduced model (TV + Radio) has a slightly higher adjusted R-squared than the full model, indicating a better fit with fewer predictors.
+
+### Result: Slightly better adjusted R² for reduced model → remove Newspaper
+
+### Pairwise scatterplot
+
+```{r}
+pairs(Sales ~ TV + Radio, data = adver)
+```
+
+### Interpretation of Pairwise Scatterplot (Sales, TV, Radio):
+
+The pairwise scatterplot shows the relationships between **Sales**, **TV**, and **Radio** advertising:
+
+-   **Sales vs TV**: There is a **strong positive linear relationship**. As spending on TV advertising increases, Sales also tend to increase. The pattern is clear and linear, supporting the use of TV as a predictor in a linear regression model.
+
+-   **Sales vs Radio**: A **moderate positive linear relationship** is also observed. Though more spread out than the TV relationship, the trend is still upward, suggesting Radio advertising has a meaningful impact on Sales.
+
+-   **TV vs Radio**: The scatterplot shows **no strong correlation** between TV and Radio advertising budgets. The points are scattered without a clear pattern, suggesting that TV and Radio are **not highly collinear**, which is good for regression modeling.
+
+### Conclusion:
+
+Sales shows strong positive correlation with TV advertising and moderate positive correlation with Radio advertising. TV and Radio budgets appear to be largely independent.
+
+### Diagnostic Plots for lm2
+
+```{r}
+# Diagnostic Plots for lm2
+par(mfrow=c(2,2))
+plot(lm2)
+```
+
+### Diagnostic Plots Interpretation (for Reduced Model):
+
+These diagnostic plots help assess the assumptions of the multiple linear regression model:
+
+### 1. **Residuals vs Fitted**
+
+-   This plot checks for **linearity** and **homoscedasticity**.
+
+-   The residuals appear to be randomly scattered around the horizontal line, indicating that:
+
+    The relationship between predictors and response is likely **linear**.
+
+    There is **no clear pattern**, suggesting **constant variance** (no heteroscedasticity).
+
+### 2. **Normal Q-Q Plot**
+
+-   This plot checks for **normality of residuals**.
+
+-   The residual points mostly fall along the straight line, indicating that the residuals are **approximately normally distributed**.
+
+### 3. **Scale-Location Plot**
+
+-   This plot also checks for **homoscedasticity**, using standardized residuals.
+
+-   The red line is mostly flat and the spread of residuals is consistent across fitted values, suggesting **homogeneity of variance**.
+
+### 4. **Residuals vs Leverage**
+
+-   This plot identifies **influential points** that may disproportionately affect the model.
+
+-   There are no points with **unusually high leverage** or **extreme residuals**, indicating that there are **no strong outliers or influential observations**.
+
+### Conclusion:
+
+The diagnostic plots suggest that the reduced model meets the assumptions of linearity, normality, constant variance, and no influential outliers. Thus, the model appears appropriate for inference and prediction.
+
+### Residuals vs Fitted for lm2
+
+```{r}
+# Residuals vs Fitted for lm2
+plot(fitted(lm2), resid(lm2),
+     xlab="Fitted values", ylab="Residuals",
+     main="Residuals vs Fitted")
+abline(h=0, col="red")
+```
+
+### Interpretation:
+
+The Residuals vs Fitted plot shows that residuals are randomly scattered around zero with no strong pattern, supporting the assumptions of linearity and constant variance.
+
+### QQ plot for residuals (Normality)
+
+```{r}
+# QQ plot for residuals (Normality)
+qqnorm(rstandard(lm2))
+qqline(rstandard(lm2))
+```
+
+### Interpretation:
+
+The Q-Q plot suggests that the residuals are **approximately normally distributed**, with **minor deviations at the tails**. This does **not seriously violate** the normality assumption required for multiple linear regression.
+
+### Boxplots to check for outliers in predictors
+
+```{r}
+# Boxplots to check for outliers in predictors
+boxplot(adver[, c("TV", "Radio", "Newspaper")], 
+        main="Boxplots of Advertising Budgets", 
+        col=c("green", "red", "orange"))
+
+```
+
+### Interpretation:
+
+The boxplots show that **TV has the largest budget range**, while **Newspaper advertising contains a few outliers**. No extreme values are observed for TV or Radio. This insight helps explain why Newspaper may not be a strong predictor in the regression model — its distribution is more scattered and includes outlying values.
+
+### Why Use a Box-Cox Transformation for `lm1?`
+
+### For Model (`lm1: Sales ~ TV + Radio + Newspaper`)
+
+-   We already checked the **residuals vs fitted plot** and **QQ plot**, which were **mostly okay**, but:
+
+    There was **some non-linearity** and **slight skewness** in the residuals.
+
+-   So using `boxcox()` helps :
+
+    **Confirm whether transformation is needed**, and
+
+    **Find the best power transformation** (e.g., log, sqrt, etc.) to improve the model.
+
+```{r}
+# Box-Cox transformation for lm1
+boxcox(lm1, lambda = seq(-2, 2, 0.1),
+       main = "Box-Cox Transformation for Sales")
+```
+
+### Interpretation:
+
+The Box-Cox transformation plot indicates that the optimal $\lambda$ is close to 1, and **no transformation of the response variable is necessary**. This supports using the original Sales variable in the multiple linear regression model.
+
+### Check Influential Observations
+
+```{r}
+# Check Influential Observations
+influence.measures(lm2)
+plot(lm2, which=4) # Cook's distance
+plot(lm2, which=5) # Residuals vs Leverage
+```
+
+### Influential Observations and Outlier Diagnostics:
+
+We assessed potential influential data points using **Cook’s Distance** and the **Residuals vs Leverage** plot.
+
+### Cook’s Distance Plot:
+
+-   **Cook’s Distance** measures how much a single observation influences the fitted regression coefficients.
+
+-   Points **6**, **36**, and especially **131** stand out with the **highest Cook’s distances**.
+
+-   However, none of the Cook’s distances exceed the common rule-of-thumb threshold of **1**, indicating **no extremely influential outliers**.
+
+### Residuals vs Leverage Plot:
+
+-   This plot highlights observations with both **high leverage** and **large residuals**, which can be particularly influential.
+
+-   Observations **6**, **36**, and **131** are again labeled and lie **furthest from the center**.
+
+-   Observation **131** shows **moderately high leverage and a notable residual**, suggesting it has **some influence**, but **not enough to distort the model**.
+
+### Conclusion:
+
+While observations 6, 36, and 131 show some degree of influence, none exceed critical thresholds for Cook’s distance or leverage. Therefore, we conclude that there are **no influential outliers** that threaten the validity of the model.
+
+### Check multicollinearity
+
+```{r}
+# Check multicollinearity
+vif(lm2)  # Variance Inflation Factors
+```
+
+Common rule of thumb:
+
+-   **VIF \> 5** may indicate moderate multicollinearity.
+
+-   **VIF \> 10** indicates serious multicollinearity problems.
+
+### Conclusion:
+
+VIF values **close to 1** indicate **no multicollinearity**.
+
+# --- Model Extensions ---
+
+### 1. Interaction Model (TV \* Radio)
+
+```{r}
+# 1. Interaction Model (TV * Radio)
+lm_interaction <- lm(Sales ~ TV * Radio, data = adver)
+summary(lm_interaction)
+```
+
+We fit a multiple linear regression model including an **interaction term** between **TV** and **Radio** advertising:
+
+$\text{Sales} = \beta_0 + \beta_1 \cdot \text{TV} + \beta_2 \cdot \text{Radio} + \beta_3 \cdot (\text{TV} \times \text{Radio}) + \varepsilon$
+
+### Coefficient Interpretations:
+
+-   **Intercept (6.783)**: Expected sales when TV and Radio spending are both 0 (though this isn’t practical, it anchors the model).
+
+-   **TV (0.01925)**: The effect of TV on Sales **depends on the level of Radio** spending. It represents the slope of TV **when Radio = 0**.
+
+-   **Radio (0.02862)**: The effect of Radio on Sales **when TV = 0**.
+
+-   **Interaction (TV:Radio = 0.001075)**: Highly significant. This shows that **the effect of TV advertising increases as Radio advertising increases**, and vice versa.
+
+### Model Fit:
+
+-   **Residual standard error** is **0.972**, much smaller than the previous models (\~1.69), meaning residuals are tighter.
+
+-   **Adjusted R-squared = 0.9652** → **96.5%** of the variation in Sales is explained by this model — a **huge improvement** over the additive model.
+
+-   **All predictors including the interaction term are statistically significant** (p \< 0.01).
+
+-   **F-statistic** = 1838 (p \< 2.2e-16) confirms that the model is highly significant.
+
+### Conclusion:
+
+Including the **interaction between TV and Radio** significantly improves the model. The interaction term is highly significant (p \< 0.001), and the model explains 96.5% of the variation in Sales — much higher than the additive model. This suggests that **TV and Radio work better together** than separately when it comes to driving sales.
+
+### 2. Quadratic Model
+
+```{r}
+# 2. Quadratic Model
+lm_poly <- lm(Sales ~ TV + I(TV^2) + Radio + I(Radio^2), data = adver)
+summary(lm_poly)
+```
+
+### Reduced Quadratic Model
+
+```{r}
+# Radio² was not statistically significant (p ≈ 0.13)
+lm_poly <- lm(Sales ~ TV + I(TV^2) + Radio, data = adver)
+summary(lm_poly)
+```
+
+We fit the following model (Polynomial Regression (Quadratic Terms):
+
+$\text{Sales} = \beta_0 + \beta_1 \cdot \text{TV} + \beta_2 \cdot \text{TV}^2 + \beta_3 \cdot \text{Radio} + \beta_4 \cdot \text{Radio}^2 + \varepsilon$
+
+### Interpretation of Coefficients:
+
+-   **Intercept (1.624)**: The expected Sales when all predictors are zero (not meaningful in isolation but needed for model structure).
+
+-   **TV (linear term: 0.07892)**: Sales increase with TV ad spending, but...
+
+-   **TV² (quadratic term: –0.0001156)**: The **negative sign** suggests **diminishing returns** — the rate of increase in Sales slows down at higher TV budgets.
+
+-   **Radio (linear: 0.1502)**: Positive effect on Sales.
+
+-   **Radio² (quadratic: 0.0008631)**: This term is **not statistically significant** (p = 0.13), suggesting no strong nonlinear effect for Radio.
+
+### Model Fit:
+
+-   **Residual standard error**: 1.518 (better than base model, not as good as interaction model)
+
+-   **Adjusted R-squared**: **0.9151** → The model explains about **91.5%** of the variation in Sales.
+
+-   **F-statistic**: 537.1, p \< 2.2e-16 → The model overall is highly significant.
+
+### Conclusion:
+
+The polynomial model improves model fit compared to the basic additive model. The **TV² term is significant**, indicating **diminishing returns** on TV advertising. However, the **Radio² term is not significant**, so adding a nonlinear effect for Radio may not be necessary. The model explains **91.5%** of the variation in Sales, though not as well as the interaction model.
+
+### 3. Model Comparison Table
+
+### AIC Comparison
+
+```{r}
+models <- list(
+  "Full Model" = lm1,
+  "Reduced Model" = lm2,
+  "Quadratic Model" = lm_poly,
+  "Interaction Model" = lm_interaction
+)
+
+# Extract AIC values only
+aic_values <- sapply(models, AIC)
+
+# Convert to data frame
+aic_df <- data.frame(Model = names(aic_values), AIC = round(aic_values, 2))
+print(aic_df)
+
+```
+
+### AIC Model Comparison Table
+
+| **Model**                     | **Adjusted R²** | **Residual Std. Error** | **AIC** | **Notes**                        |
+|-----------------|-------------|-------------|-------------|---------------|
+| Full (TV + Radio + Newspaper) | 0.8942          | 1.695                   | 784.5   | Newspaper not significant        |
+| Reduced (TV + Radio)          | 0.8947          | 1.691                   | 782.6   | Simpler, slightly better         |
+| Quadratic (TV + TV² + Radio)  | 0.9151          | 1.518                   | 741.8   | TV² significant, Radio² excluded |
+| Interaction (TV × Radio)      | 0.9652          | 0.972                   | 562.4   | **Best fit overall**             |
+
+### Interpretation:
+
+-   The **Interaction model (TV \* Radio)** has:
+
+    The **highest Adjusted R² (0.9652)**
+
+    The **lowest Residual Standard Error (0.972)**
+
+    The **lowest AIC (562.4)**
+
+-   The **Quadratic** **model** improves over the simple additive model but not as much as the interaction model.
+
+-   **Reduced model (TV + Radio)** is good if you want simplicity, but if you care about predictive power, the **Interaction model is the best**.
+
+# Recommended Final Model
+
+Choose the **Interaction Model** for your final project paper!
+
+### Conclusion:
+
+Based on Adjusted $R^2$, Residual Standard Error, and AIC comparisons, the model including an interaction between TV and Radio provides the best fit to the data. Therefore, the interaction model was selected as the final model for analysis.
+
+### 4. LASSO Regression
+
+```{r}
+# 5. LASSO Regression
+
+# Prepare data for glmnet
+x <- as.matrix(adver[, c("TV", "Radio", "Newspaper")])
+y <- adver$Sales
+
+# Split data into training and testing
+set.seed(123)
+train_idx <- createDataPartition(y, p=0.8, list=FALSE)
+x_train <- x[train_idx, ]
+x_test <- x[-train_idx, ]
+y_train <- y[train_idx]
+y_test <- y[-train_idx]
+
+# LASSO model with cross-validation
+lasso_cv <- cv.glmnet(x_train, y_train, alpha=1)
+plot(lasso_cv)
+
+# Best lambda
+lasso_cv$lambda.min
+
+# Fit final LASSO model
+lasso_model <- glmnet(x_train, y_train, alpha=1, lambda=lasso_cv$lambda.min)
+coef(lasso_model)
+
+# Predict and calculate RMSE
+lasso_pred <- predict(lasso_model, s=lasso_cv$lambda.min, newx=x_test)
+sqrt(mean((y_test - lasso_pred)^2))
+
+```
+
+### LASSO vs. Interaction Model Comparison
+
+| **Metric**                | **LASSO Regression**        | **Interaction Model**       |
+|-----------------------|-------------------------|-------------------------|
+| **Model Type**            | Regularized Linear          | OLS with Interaction        |
+| **Included Predictors**   | TV, Radio                   | TV, Radio, TV × Radio       |
+| **Intercept**             | 3.156                       | 6.783                       |
+| **TV Coefficient**        | 0.0452                      | 0.01925                     |
+| **Radio Coefficient**     | 0.1815                      | 0.02862                     |
+| **Newspaper Coefficient** | Excluded (0)                | Not included                |
+| **Interaction Term**      | Not included                | 0.001075                    |
+| **Adjusted R²**           | N/A (not defined for LASSO) | 0.9652                      |
+| **RMSE**                  | 1.624 (on test data)        | 0.972 (residual std. error) |
+| **Model Strength**        | Good for variable selection | Best fit overall            |
+
+### Interpretation:
+
+The **LASSO regression model** uses regularization to perform automatic variable selection. It retained **TV and Radio** as predictors while **eliminating Newspaper**, confirming its limited contribution. Although useful for simplifying the model, LASSO does **not provide an adjusted R²** and had a higher RMSE (**1.624**) on the test set.
+
+In contrast, the **interaction model** includes an interaction term between **TV and Radio**, capturing how their combined effect influences Sales. It achieved a much lower RMSE (**0.972**) and a higher adjusted R² (**0.9652**), making it the **best-fitting model overall**.
+
+### Conclusion:
+
+While LASSO is effective for identifying key predictors, the interaction model offers **superior predictive performance** and should be selected as the **final model** for this analysis.
+
+### 5. Random Forest
+
+```{r}
+# 5. Random Forest
+
+set.seed(123)
+rf_model <- randomForest(Sales ~ TV + Radio + Newspaper, data=adver, importance=TRUE)
+print(rf_model)
+
+# Variable Importance
+importance(rf_model)
+varImpPlot(rf_model)
+
+# Predict with Random Forest
+rf_pred <- predict(rf_model, adver)
+sqrt(mean((adver$Sales - rf_pred)^2))  # RMSE on full data
+
+```
+
+### Variable Importance:
+
+| Predictor     | \% Increase in MSE (%IncMSE) | Increase in Node Purity (IncNodePurity) |
+|-----------------|------------------------|--------------------------------|
+| **TV**        | 71.91                        | 2676.22                                 |
+| **Radio**     | 55.84                        | 1761.40                                 |
+| **Newspaper** | 2.67                         | 778.43                                  |
+
+#### Interpretation:
+
+-   TV and Radio are **strong predictors** of Sales.
+
+-   **Newspaper has very little importance** — it contributes almost nothing to prediction, consistent with your OLS and LASSO findings.
+
+### Compared to Other Models:
+
+|                   | RMSE / RSE  | \% Variance Explained / R² |
+|-------------------|-------------|----------------------------|
+| Interaction Model | RSE ≈ 0.972 | Adjusted R² = 96.5%        |
+| Random Forest     | RMSE ≈ 1.49 | \% Var Explained = 91.8%   |
+
+So, even **Random Forest is good**, but it is not better than interaction model in terms of predictive accuracy.
+
+### Conclusion:
+
+The Random Forest model confirms that **TV and Radio are the most important predictors** of Sales, while Newspaper contributes very little. The model explains **91.8% of the variance**, with a root mean squared error (RMSE) of about 1.49. Although Random Forest is a powerful non-linear model, it does **not outperform the interaction model**, which remains the best based on adjusted R² and residual accuracy.
+
+### **6. Cross validation**
+
+```{r}
+# Cross-Validation of All Six Models
+# Load necessary libraries
+library(caret)
+library(glmnet)
+library(randomForest)
+library(dplyr)
+
+# Set seed and split the data
+set.seed(232)
+train_idx <- createDataPartition(adver$Sales, p = 0.7, list = FALSE)
+train_data <- adver[train_idx, ]
+test_data <- adver[-train_idx, ]
+
+# 1. Full Model
+lm_full <- lm(Sales ~ TV + Radio + Newspaper, data = train_data)
+full_pred <- predict(lm_full, newdata = test_data)
+
+# 2. Reduced Model
+lm_reduced <- lm(Sales ~ TV + Radio, data = train_data)
+reduced_pred <- predict(lm_reduced, newdata = test_data)
+
+# 3. Interaction Model
+lm_interaction <- lm(Sales ~ TV * Radio, data = train_data)
+interaction_pred <- predict(lm_interaction, newdata = test_data)
+
+# 4. Polynomial Model
+lm_poly <- lm(Sales ~ TV + I(TV^2) + Radio + I(Radio^2), data = train_data)
+poly_pred <- predict(lm_poly, newdata = test_data)
+
+# 5. LASSO Model
+x_train <- as.matrix(train_data[, c("TV", "Radio", "Newspaper")])
+y_train <- train_data$Sales
+x_test <- as.matrix(test_data[, c("TV", "Radio", "Newspaper")])
+y_test <- test_data$Sales
+
+lasso_cv <- cv.glmnet(x_train, y_train, alpha = 1)
+lasso_model <- glmnet(x_train, y_train, alpha = 1, lambda = lasso_cv$lambda.min)
+lasso_pred <- predict(lasso_model, newx = x_test)
+
+# 6. Random Forest Model
+rf_model <- randomForest(Sales ~ TV + Radio + Newspaper, data = train_data)
+rf_pred <- predict(rf_model, newdata = test_data)
+
+# Performance Metrics Function
+metrics <- function(pred, actual) {
+  data.frame(
+    RMSE = RMSE(pred, actual),
+    R2 = R2(pred, actual),
+    MAE = MAE(pred, actual)
+  )
+}
+
+# Compile Results
+cv_results <- bind_rows(
+  metrics(full_pred, test_data$Sales)      %>% mutate(Model = "Full"),
+  metrics(reduced_pred, test_data$Sales)   %>% mutate(Model = "Reduced"),
+  metrics(interaction_pred, test_data$Sales) %>% mutate(Model = "Interaction"),
+  metrics(poly_pred, test_data$Sales)      %>% mutate(Model = "Polynomial"),
+  metrics(lasso_pred, y_test)              %>% mutate(Model = "LASSO"),
+  metrics(rf_pred, test_data$Sales)        %>% mutate(Model = "Random Forest")
+)
+
+# Arrange by RMSE
+cv_results <- cv_results %>% select(Model, everything()) %>% arrange(RMSE)
+print(cv_results)
+
+```
+
+### Interpretation:
+
+To evaluate the model’s predictive performance on the unseen data, we used a simple strategy for cross validation to randomly divide the data set into two parts: a training set (70%) and a test set (30%). Cross validation can train each of the 6 models, predict on the test set, calculate **RMSE**, **R²**, and **MAE**. And weoutput a **comparison table sorted by RMSE.**
+
+Cross-validation confirmed that the **interaction model** (TV × Radio) achieved the **best predictive performance**, with the lowest RMSE (0.799), highest R² (0.979), and lowest MAE (0.689) among all six models.
+
+------------------------------------------------------------------------
+
+### Ultimate Model Comparison Table
+
+| **Model**                             | **Adjusted R²** | **Original RMSE / RSE** | **Cross-Validated RMSE** | **Included Predictors**        | **Strength**                     |
+|------------|------------|------------|------------|------------|------------|
+| Full (TV + Radio + Newspaper)         | 0.8942          | 1.695                   | 1.619                    | TV, Radio, Newspaper           | Newspaper not significant        |
+| Reduced (TV + Radio)                  | 0.8947          | 1.691                   | 1.615                    | TV, Radio                      | Simpler, slightly better         |
+| Interaction (TV \* Radio)             | 0.9652          | 0.972                   | **0.799**                | TV, Radio, TV × Radio          | **Best fit overall**             |
+| Quadratic (TV + TV² + Radio + Radio²) | 0.9151          | 1.518                   | 1.477                    | TV, TV², Radio, Radio²         | TV² significant, Radio² not      |
+| LASSO Regression                      | N/A             | 1.624                   | 1.606                    | TV, Radio (Newspaper excluded) | Good for variable selection      |
+| Random Forest                         | N/A             | 1.490                   | 1.374                    | TV, Radio, Newspaper           | Strong, non-linear, but not best |
+
+### Key Takeaways
+
+-   The **interaction model (TV × Radio)** achieved the **highest Adjusted R² (0.9652)** and the **lowest cross-validated RMSE (0.799)**, indicating the best overall performance both in-sample and out-of-sample.
+
+-   **Random Forest** performed well, explaining approximately **91.8% of the variance**, but did not outperform the interaction model.
+
+-   The **polynomial model** improved upon simpler models and captured diminishing returns for TV, but still fell short of the interaction model in predictive accuracy.
+
+-   **LASSO regression** effectively identified TV and Radio as the most relevant predictors by shrinking the Newspaper coefficient to zero, though it had a higher RMSE (1.606).
+
+-   The **reduced model (TV + Radio)** offered a simpler alternative with reasonable performance but was less accurate than the interaction model.
+
+### Conclusion
+
+Based on comprehensive model comparison and cross-validation results, the **interaction model** demonstrates the best combination of model fit and predictive accuracy. Accordingly, it is selected as the final model for this analysis.
+
+## Optimal Allocation from Interaction model
+
+We want to determine the optimal allocation between TV and Radio advertising from interaction model.
+
+#### Using Lagrange Multipliers
+
+We want to maximize the Sales function based on the interaction model:
+
+$$
+\text{Sales}(TV, Radio) = 6.783 + 0.01925 \cdot TV + 0.02862 \cdot Radio + 0.001075 \cdot TV \cdot Radio
+$$
+
+Subject to the budget constraint:
+
+$$
+TV + Radio = B
+$$
+
+We construct the Lagrangian function:
+
+$$
+\mathcal{L}(TV, Radio, \lambda) = 6.783 + 0.01925 \cdot TV + 0.02862 \cdot Radio + 0.001075 \cdot TV \cdot Radio - \lambda (TV + Radio - B)
+$$
+
+Take the partial derivatives:
+
+$$
+\frac{\partial \mathcal{L}}{\partial TV} = 0.01925 + 0.001075 \cdot Radio - \lambda = 0
+$$
+
+$$
+\frac{\partial \mathcal{L}}{\partial Radio} = 0.02862 + 0.001075 \cdot TV - \lambda = 0
+$$
+
+$$
+\frac{\partial \mathcal{L}}{\partial \lambda} = TV + Radio - B = 0
+$$
+
+Subtract the first two equations to eliminate $\lambda$:
+
+$$
+(0.01925 + 0.001075 \cdot Radio) - (0.02862 + 0.001075 \cdot TV) = 0
+$$
+
+Simplifying:
+
+$$
+0.001075 \cdot (Radio - TV) = 0.00937
+$$
+
+Therefore, the clear relationship between Radio and TV is:
+
+$$
+Radio - TV = \frac{0.00937}{0.001075} = 8.72
+$$
+
+Substitute into the budget constraint $TV + Radio = B$:
+
+$$
+TV + (TV + 8.72) = B
+\Rightarrow 2TV = B - 8.72
+\Rightarrow TV = \frac{B - 8.72}{2}
+$$
+
+$$
+Radio = \frac{B + 8.72}{2}
+$$
+
+After setting the marginal effects equal and simplifying:
+
+$$
+\boxed{Radio = TV + 8.72}
+$$
+
+This means: to equalize marginal gains from advertising expenditures, the **Radio budget should be \$8.72k higher than the TV budget**.
+
+### Using `optim()` for budget = 100
+
+```{r}
+# Load necessary library
+library(alabama)
+# Define the negative Sales function (since optim minimizes by default)
+sales_function <- function(x) {
+  TV <- x[1]
+  Radio <- x[2]
+  # Negative of the predicted sales
+  - (6.783 + 0.01925 * TV + 0.02862 * Radio + 0.001075 * TV * Radio)
+}
+
+# Total budget
+budget <- 100
+
+# Constraint: TV + Radio = budget
+constraint_eq <- function(x) {
+  x[1] + x[2] - budget
+}
+
+# Initial guess
+initial_guess <- c(TV = 50, Radio = 50)
+
+# Solve using optim with equality constraint
+library(alabama)
+opt_result <- auglag(
+  par = initial_guess,
+  fn = sales_function,
+  heq = constraint_eq,
+  control.outer = list(trace = FALSE)
+)
+
+# Extract optimal allocation
+optimal_tv <- opt_result$par[1]
+optimal_radio <- opt_result$par[2]
+max_sales <- -opt_result$value  # negate to get max
+
+# Show results
+cat("Optimal TV Budget:", round(optimal_tv, 2), "\n")
+cat("Optimal Radio Budget:", round(optimal_radio, 2), "\n")
+cat("Maximum Predicted Sales:", round(max_sales, 2), "\n")
+
+
+```
+
+------------------------------------------------------------------------
+
+## 
+
+### Full Conclusion
+
+In this study, we analyzed the Advertisement Sales dataset to investigate the relationship between advertising expenditures across different media channels—TV, Radio, and Newspaper—and product sales. Multiple linear regression modeling revealed that TV and Radio advertising budgets have statistically significant positive effects on sales, whereas Newspaper advertising showed no meaningful contribution. Through a systematic model-building process, we compared the full model, a reduced model, a polynomial model, an interaction model, LASSO regression, and Random Forest regression. Diagnostic checks confirmed that key regression assumptions—including linearity, normality, homoscedasticity, and absence of multicollinearity—were satisfied, and no influential outliers were detected that could bias the model estimates.
+
+Among all the models considered, the interaction model incorporating the interaction between TV and Radio advertising expenditures demonstrated the best performance, achieving the highest adjusted R² (0.9652) and the lowest residual standard error (0.972). This suggests that the combined effect of TV and Radio advertising is greater than the sum of their individual effects, highlighting a synergy between these media channels. Variable selection techniques such as LASSO regression and non-linear approaches like Random Forest further reinforced the finding that Newspaper advertising has minimal predictive value. Based on a comprehensive model comparison, the interaction model was selected as the final model for analysis.
+
+These results provide actionable insights for marketing strategists: jointly optimizing TV and Radio advertising investments can substantially enhance sales performance. Specifically, based on marginal effect balancing derived from the interaction model, the Radio budget should be approximately \$8.72k higher than the TV budget to maximize predicted sales. To validate model robustness, we applied a 70/30 cross-validation procedure across all models. The interaction model again achieved the best performance, with the lowest cross-validated RMSE (0.799) and the highest predictive R² (0.979), further confirming its superiority for generalization to unseen data.
+
+Future research could build upon this study by incorporating additional covariates such as product type, seasonal trends, and demographic factors to refine predictive modeling. Furthermore, applying time-series analysis and causal inference methods, such as A/B testing, would strengthen the generalizability and causal interpretation of advertising strategies. Ultimately, this analysis underscores the critical importance of strategic budget allocation across media channels, demonstrating that coordinated TV and Radio advertising efforts can significantly amplify sales effectiveness.
