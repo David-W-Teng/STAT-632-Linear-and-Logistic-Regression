@@ -1,0 +1,153 @@
+---
+title: "STAT632 Project: Advertisement Sales Modeling"
+format: pdf
+editor: visual
+---
+
+```{r}
+# --- 1. Load Required Libraries ---
+library(MASS)          # Box-Cox transformation
+library(glmnet)        # LASSO regression
+library(randomForest)  # Random Forest
+library(car)           # Multicollinearity (VIF)
+library(ggplot2)       # Data visualization
+library(caret)         # Train/test split and validation
+library(dplyr)         # Data manipulation
+```
+
+```{r}
+# --- 2. Load and Explore Data ---
+adver <- read.csv("Advertising And Sales.csv")
+summary(adver)
+str(adver)
+```
+
+```{r}
+# --- 3. Pairwise Scatterplot ---
+pairs(Sales ~ TV + Radio + Newspaper, data = adver,
+      main = "Pairwise Scatterplot of Sales and Advertising Channels")
+```
+
+```{r}
+# --- 4. Remove Outliers ---
+adver <- adver[-c(131, 156, 99, 108, 200), ]
+```
+
+```{r}
+# --- 5. Check Missing Values ---
+colSums(is.na(adver))
+```
+
+```{r}
+# --- 6. Base Linear Model (TV, Radio, Newspaper) ---
+lm1 <- lm(Sales ~ TV + Radio + Newspaper, data = adver)
+summary(lm1)
+```
+
+```{r}
+# --- 7. Reduced Linear Model (TV and Radio only) ---
+lm2 <- lm(Sales ~ TV + Radio, data = adver)
+summary(lm2)
+```
+
+```{r}
+# --- 8. Interaction Model (TV * Radio * Newspaper) ---
+lm_interaction <- lm(Sales ~ TV * Radio * Newspaper, data = adver)
+summary(lm_interaction)
+```
+
+```{r}
+# --- 9. Full Polynomial + Interaction Model ---
+lm_poly <- lm(Sales ~ TV + I(TV^2) + Radio + I(Radio^2) +
+              Newspaper + I(Newspaper^2) + I(TV^3) + I(TV^4) + I(TV^5) +
+              TV * Radio * Newspaper, data = adver)
+summary(lm_poly)
+```
+
+```{r}
+# --- 10. Reduced Polynomial + Interaction Model ---
+lm_poly1 <- lm(Sales ~ TV + I(TV^2) + Radio + TV:Radio +
+               I(TV^3) + I(TV^4) + I(TV^5), data = adver)
+summary(lm_poly1)
+```
+
+```{r}
+# --- 11. Residual Diagnostics ---
+plot(lm_poly1, which = 2)  # Q-Q plot
+shapiro.test(residuals(lm_poly1))  # Normality test
+
+# Standardized residuals
+std_residuals <- rstandard(lm_poly1)
+outliers <- which(abs(std_residuals) > 3)
+cat("Outliers are at rows:", outliers, "\n")
+
+# Residuals vs Fitted
+plot(lm_poly1$fitted.values, std_residuals,
+     main = "Standardized Residuals vs Fitted",
+     xlab = "Fitted values", ylab = "Standardized Residuals")
+abline(h = c(-3, 3), col = "red", lty = 2)
+```
+
+```{r}
+# --- 12. Model Comparison Table ---
+models <- list(
+  "Full Model" = lm1,
+  "Polynomial Model" = lm_poly,
+  "Interaction Model" = lm_interaction,
+  "Reduced Polynomial" = lm_poly1
+)
+
+aic_table <- data.frame(
+  Model = names(models),
+  Adjusted_R2 = sapply(models, function(m) round(summary(m)$adj.r.squared, 4)),
+  Residual_Std_Error = sapply(models, function(m) round(summary(m)$sigma, 3)),
+  AIC = sapply(models, function(m) round(AIC(m), 2))
+)
+print(aic_table)
+```
+
+```{r}
+# --- 13. Cross-Validation (Train/Test Split) ---
+set.seed(213)
+train_index <- createDataPartition(adver$Sales, p = 0.7, list = FALSE)
+train_data <- adver[train_index, ]
+test_data <- adver[-train_index, ]
+
+# Fit the final model
+lm_model <- lm(Sales ~ TV + I(TV^2) + Radio + TV:Radio +
+               I(TV^3) + I(TV^4) + I(TV^5), data = adver)
+
+# RMSE for training and testing sets
+train_rmse <- sqrt(mean((predict(lm_model, train_data) - train_data$Sales)^2))
+test_rmse <- sqrt(mean((predict(lm_model, test_data) - test_data$Sales)^2))
+cat("Train RMSE:", train_rmse, "Test RMSE:", test_rmse, "\n")
+```
+
+```{r}
+# --- 14. Random Forest Model and Comparison ---
+rf_model <- randomForest(Sales ~ TV + I(TV^2) + Radio + I(TV^3) + I(TV^4) +
+                         TV:Radio + I(TV^5), data = adver)
+
+# Compare RMSE
+lm_pred <- predict(lm_model, adver)
+rf_pred <- predict(rf_model, adver)
+cat("Linear Model RMSE:", sqrt(mean((lm_pred - adver$Sales)^2)), "\n")
+cat("Random Forest RMSE:", sqrt(mean((rf_pred - adver$Sales)^2)), "\n")
+```
+
+```{r}
+# --- 15. LASSO Regression ---
+x <- model.matrix(Sales ~ TV + I(TV^2) + Radio + TV:Radio +
+                  I(TV^3) + I(TV^4), data = adver)[, -1]
+y <- adver$Sales
+
+# Cross-validated LASSO
+lasso_cv <- cv.glmnet(x, y, alpha = 1)
+cat("Best lambda:", lasso_cv$lambda.min, "\n")
+
+# Final LASSO model
+lasso_model <- glmnet(x, y, alpha = 1, lambda = lasso_cv$lambda.min)
+lasso_predictions <- predict(lasso_model, newx = x)
+head(lasso_predictions)
+
+```
